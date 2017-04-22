@@ -2,29 +2,23 @@ package main
 
 import (
 	"fmt"
-	"image"
-	"log"
 	"time"
 
-	"github.com/BurntSushi/xgbutil"
-	"github.com/BurntSushi/xgbutil/xevent"
 	"github.com/gonum/plot"
 	"github.com/gonum/plot/plotter"
 	"github.com/gonum/plot/plotutil"
-	"github.com/gonum/plot/vg"
-	"github.com/gonum/plot/vg/draw"
-	"github.com/gonum/plot/vg/vgimg"
 	"github.com/kniren/gota/dataframe"
 	"github.com/kniren/gota/series"
-	"github.com/wiless/cellular/deployment"
 	"github.com/wiless/channelmodel"
+	"github.com/wiless/plotutils"
 	"github.com/wiless/vlib"
-	"github.com/wiless/x11ui"
 )
 
 var start time.Time
 
 const dpi = 96
+
+var p *plot.Plot
 
 func init() {
 	start = time.Now()
@@ -35,71 +29,62 @@ func closing() {
 	fmt.Println("\n========  End RUNTIME =  ", time.Since(start))
 }
 
-var img *image.RGBA
-
-// Initialize plotters
-// var p *plot.Plot
-var canvas draw.Canvas
-var plotwin *x11ui.Window
-
 var pl CM.RMa
+var pl2 CM.UMa
 var ds dataframe.DataFrame
 var recentlyRESIZED bool
-
-var resize = func() {
-	pwin, _ := plotwin.Parent()
-	appgeo, _ := pwin.Geometry()
-
-	// appgeo, _ := app.AppWin().Geometry()
-	log.Print(appgeo.Width(), appgeo.Height())
-
-	plotwin.Window.Resize(appgeo.Width(), appgeo.Height())
-	img = plotwin.CreateRawImage(0, 0, appgeo.Width(), appgeo.Height())
-	recentlyRESIZED = false
-	// canvas = draw.New(vgimg.NewWith(vgimg.UseImage(img)))
-	// plotPL()
-}
+var locations vlib.VectorPos3D
 
 func main() {
 	recentlyRESIZED = true
 	defer closing()
 
-	// p.Save(4*vg.Inch, 4*vg.Inch, "output.png")
-	app := x11ui.NewApplication("Application ", 400, 300, true, false)
-	app.Debug = false
-	app.DefaultKeys(true)
-	plotwin = app.NewChildWindow("child", 0, 0, 400, 300)
-
-	img = plotwin.CreateRawImage(0, 0, 400, 300)
-
-	// xevent.ResizeRequestFun(
-	// 	func(X *xgbutil.XUtil, e xevent.ResizeRequestEvent) {
-	// 		log.Print("1.========Outside plot win Received ", e)
-	// 		// plotwin.ReSize(int(e.Width), int(e.Height))
-	// 		plotwin.Window.Resize(int(e.Width), int(e.Height))
-	//
-	// 	}).Connect(app.X(), app.AppWin().Id)
-	//
-
-	xevent.ConfigureNotifyFun(
-		func(p *xgbutil.XUtil, e xevent.ConfigureNotifyEvent) {
-			log.Printf("2. PLTWN ceived CONFIGNOTIFICATION ", e)
-			// plotwin.Window.Resize(int(e.Width), int(e.Height))
-			// plotwin.ReDrawImage()
-			recentlyRESIZED = true
-		}).Connect(app.X(), app.AppWin().Id)
-
-	app.RegisterKey("r", resize)
-
-	fmt.Print("Testing the Channel model")
+	fmt.Print("Testing the Channel model\n ")
 
 	pl.Init(30, 1.5, .7)
 	pl.ForceLOS = false
 
 	/// Acutal Data Manipulations
-	points := deployment.RectangularNPoints(vlib.Origin3D.Cmplx(), 1000, 500, 30, 700)
-	locations := vlib.FromVectorC(points, 10)
-	updatePathLoss(pl, locations)
+	// points := deployment.RectangularNPoints(vlib.Origin3D.Cmplx(), 1000, 500, 30, 700)
+	// locations = vlib.FromVectorC(points, 10)
+	// updatePathLoss(pl, locations)
+	p, _ = plot.New()
+	var N = 15300
+	var dist, vpl vlib.VectorF
+
+	vlos := make([]bool, N)
+	dist.Resize(N)
+	vpl.Resize(N)
+	cnt := 0
+	for ii := 10; ii < N; ii++ {
+		d := float64(ii)
+		loss, islos, err := pl.PL(d)
+		if err == nil {
+			dist[cnt] = d
+			vpl[cnt] = -loss
+			vlos[cnt] = islos
+		} else {
+			fmt.Println(d, loss, err)
+		}
+		cnt++
+	}
+	N = cnt
+	dist.Resize(N)
+	vpl.Resize(N)
+
+	ds = dataframe.New(series.Ints(vlib.NewSegmentI(1, N)), series.Floats(dist), series.Floats(vpl))
+	ds.SetNames([]string{"Index", "distance", "PL"})
+
+	fmt.Print(ds)
+	// fmt.Println("Selected ", ds.Subset([]int(vlib.ToVectorI("0:10:100"))))
+	// fmt.Println("Random ", ds.Subset(vlib.RandI(30, N)))
+	var m vlib.MatrixF
+	m.AppendColumn(ds.Col("distance").Float()).AppendColumn(ds.Col("PL").Float()).AppendColumn(vpl.Add(-30))
+
+	pf.Plot(&m)
+	// pf.HoldOn()
+	// pf.Plot(&m, 0, 2)
+	// ds.WriteCSV(os.Stdout)
 	// fmt.Printf("Path Loss is : %v  \n", ds)
 	// log.Print("Hello")
 	// xinfo := []int(vlib.NewSegmentI(650, 10))
@@ -107,14 +92,7 @@ func main() {
 
 	// log.Print(xxf)
 
-	plotPL()
-
-	// p.Save(500, 500, "output.png")
-	app.RegisterKey("c", newFigure)
-	app.RegisterKey("p", plotPL)
-	app.RegisterKey("s", savePlot)
-	plotwin.ReDrawImage()
-	app.Show()
+	// plotPL()
 
 }
 
@@ -127,6 +105,7 @@ func updatePathLoss(pl CM.RMa, locations vlib.VectorPos3D) {
 
 	for _, ll := range locations {
 		v, islos, _ := pl.PLbetween(vlib.Origin3D, ll)
+
 		dists.AppendAtEnd(vlib.Origin3D.DistanceFrom(ll))
 		pls.AppendAtEnd(-v)
 		los.Append(islos)
@@ -138,7 +117,6 @@ func updatePathLoss(pl CM.RMa, locations vlib.VectorPos3D) {
 
 /// FUNCITON HANDLERS
 func plotPL() {
-	p, _ := plot.New()
 	p.Add(plotter.NewGrid())
 
 	// var m vlib.MatrixF
@@ -158,46 +136,25 @@ func plotPL() {
 	// h.Normalize(1)
 	p.Add(h)
 	// p.Y.Max = 1
-	if recentlyRESIZED {
-		resize()
-
-	}
+	// if recentlyRESIZED {
+	// 	resize()
+	//
+	// }
 	p.Title.Text = fmt.Sprintf("Time %v", time.Now())
-	canvas = draw.New(vgimg.NewWith(vgimg.UseImage(img)))
-	// canvas.Rotate(math.Pi * rand.Float64() / 6)
 
-	p.Save(500, 500, "output.png")
-	p.Draw(canvas)
-	plotwin.ReDrawImage()
+	// canvas.Rotate(math.Pi * rand.Float64() / 6)
 
 }
 
-func newFigure() {
+func newFigure(fname string) {
 	// canvas.Scale(3, 4)
-	p, _ := plot.New()
-	points := deployment.RectangularNPoints(vlib.Origin3D.Cmplx(), 1000, 500, 30, 700)
-	locations := vlib.FromVectorC(points, 10)
-	updatePathLoss(pl, locations)
+
 	plotutil.AddScatters(p, locations)
 	p.Add(plotter.NewGrid())
 	p.Title.Text = fmt.Sprintf("Time %v", time.Now().Format(time.Stamp))
-	if recentlyRESIZED {
-		resize()
 
-	}
 	p.X.Label.Text = "X"
 	p.Y.Label.Text = "Y"
+	p.Save(500, 500, fname)
 
-	canvas = draw.New(vgimg.NewWith(vgimg.UseImage(img)))
-	canvas.Translate(vg.Point{10, 10})
-	canvas.Scale(.9, .9)
-	p.Save(500, 500, "output.png")
-	p.Draw(canvas)
-	plotwin.ReDrawImage()
-}
-
-func savePlot() {
-	var p *plot.Plot
-	p.Save(500, 500, "output.png")
-	log.Print("Saved into File ", "output.png")
 }
