@@ -32,11 +32,11 @@ func closing() {
 var pl CM.RMa
 var pl2 CM.UMa
 var ds dataframe.DataFrame
-var recentlyRESIZED bool
+
 var locations vlib.VectorPos3D
 
 func main() {
-	recentlyRESIZED = true
+
 	defer closing()
 
 	fmt.Print("Testing the Channel model\n ")
