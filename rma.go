@@ -17,7 +17,7 @@ import (
 //
 // }
 
-var rmaDMax float64 = 10000.0 /// max distance supported in RMA for LOS
+var rmaDMax float64 = 15000.0 /// max distance supported in RMA for LOS
 var rmaH float64 = 5          // Averge building heits in RuralMacro
 var rmaW float64 = 20         // Averge building heits in RuralMacro
 var rmaHBS float64 = 35
@@ -49,6 +49,11 @@ func (w *RMa) Init(hBS, hUT, fGHz float64) {
 	w.c2 = math.Min(0.044*hh, 14.77)
 	w.c3 = 0.002 * mlog(rmaH)
 	w.ForceLOS = false
+}
+
+func (w *RMa) SetDMax(dmax float64) {
+	w.rmaDMax = dmax
+	rmaDMax = dmax
 }
 
 // Exported functions MUST implement
@@ -139,7 +144,7 @@ func (r RMa) los(dist float64) (plDb float64, e error) {
 	var d3d, d2d float64 = dist, dist
 
 	if d2d < 10 {
-		return 0, nil
+		return 0, fmt.Errorf("Should not be issue ")
 	}
 	if 10 <= d2d && d2d <= r.dBP {
 		loss, _ := r.p1(d3d, freqGHz)
@@ -149,8 +154,8 @@ func (r RMa) los(dist float64) (plDb float64, e error) {
 		loss, _ := r.p2(d3d, freqGHz)
 		return loss, nil
 	} else {
-
-		return math.NaN(), fmt.Errorf("Unsupported distance %d for LOS ", dist)
+		// return math.NaN(), fmt.Errorf("Unsupported distance %d for LOS ", dist)
+		return 0, fmt.Errorf("Unsupported distance %d for LOS ", dist)
 	}
 }
 

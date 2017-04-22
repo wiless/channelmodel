@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gonum/plot"
-	"github.com/gonum/plot/plotter"
-	"github.com/gonum/plot/plotutil"
 	"github.com/kniren/gota/dataframe"
 	"github.com/kniren/gota/series"
 	"github.com/wiless/channelmodel"
@@ -18,14 +15,13 @@ var start time.Time
 
 const dpi = 96
 
-var p *plot.Plot
-
 func init() {
 	start = time.Now()
 	fmt.Println("=========== Started at ", start, "============")
 }
 
 func closing() {
+	pf.CloseAll()
 	fmt.Println("\n========  End RUNTIME =  ", time.Since(start))
 }
 
@@ -38,62 +34,67 @@ var locations vlib.VectorPos3D
 func main() {
 
 	defer closing()
+	pf.StartX()
 
 	fmt.Print("Testing the Channel model\n ")
 
 	pl.Init(30, 1.5, .7)
 	pl.ForceLOS = false
-
+	pl.SetDMax(15000)
 	/// Acutal Data Manipulations
 	// points := deployment.RectangularNPoints(vlib.Origin3D.Cmplx(), 1000, 500, 30, 700)
 	// locations = vlib.FromVectorC(points, 10)
 	// updatePathLoss(pl, locations)
-	p, _ = plot.New()
-	var N = 15300
+
+	var N = 10000
 	var dist, vpl vlib.VectorF
 
 	vlos := make([]bool, N)
 	dist.Resize(N)
 	vpl.Resize(N)
 	cnt := 0
-	for ii := 10; ii < N; ii++ {
+	for ii := 10; ii < N; ii += 100 {
 		d := float64(ii)
 		loss, islos, err := pl.PL(d)
-		if err == nil {
-			dist[cnt] = d
-			vpl[cnt] = -loss
-			vlos[cnt] = islos
-		} else {
-			fmt.Println(d, loss, err)
-		}
+		_ = err
+		// if err == nil {
+		dist[cnt] = d
+		vpl[cnt] = -loss
+		vlos[cnt] = islos
+		// } else {
 		cnt++
+		if err != nil {
+			fmt.Print(err)
+		}
+		// 	fmt.Println(d, loss, err)
+		// }
+
 	}
 	N = cnt
 	dist.Resize(N)
 	vpl.Resize(N)
 
-	ds = dataframe.New(series.Ints(vlib.NewSegmentI(1, N)), series.Floats(dist), series.Floats(vpl))
-	ds.SetNames([]string{"Index", "distance", "PL"})
+	ds = dataframe.New(series.Floats(dist), series.Floats(vpl))
+	ds.SetNames([]string{"distance", "PL"})
+	fmt.Println(ds.Dims())
 
-	fmt.Print(ds)
-	// fmt.Println("Selected ", ds.Subset([]int(vlib.ToVectorI("0:10:100"))))
-	// fmt.Println("Random ", ds.Subset(vlib.RandI(30, N)))
+	// ds.Arrange(dataframe.Order{Colname: "PL"})
+	// ds = ds.Filter(dataframe.F{"PL", series.Neq, 0})
+
 	var m vlib.MatrixF
-	m.AppendColumn(ds.Col("distance").Float()).AppendColumn(ds.Col("PL").Float()).AppendColumn(vpl.Add(-30))
+	m.AppendColumn(ds.Col("distance").Float()).AppendColumn(ds.Col("PL").Float()).AppendColumn(vpl.Add(-10))
 
+	pf.Fig("Kavish Plot")
 	pf.Plot(&m)
-	// pf.HoldOn()
-	// pf.Plot(&m, 0, 2)
+	//
+	// pf.SetXlabel("Distance (m)")
+	// pf.SetYlabel(`PL ($dB_m$) `)
+	pf.HoldOff()
+	//
+	pf.Plot(&m, 0, 2)
+	// pf.ShowX11()
 	// ds.WriteCSV(os.Stdout)
-	// fmt.Printf("Path Loss is : %v  \n", ds)
-	// log.Print("Hello")
-	// xinfo := []int(vlib.NewSegmentI(650, 10))
-	// xxf := ds.Filter(dataframe.F{"distance", series.GreaterEq, 100})
-
-	// log.Print(xxf)
-
-	// plotPL()
-
+	pf.Wait()
 }
 
 func updatePathLoss(pl CM.RMa, locations vlib.VectorPos3D) {
@@ -105,56 +106,11 @@ func updatePathLoss(pl CM.RMa, locations vlib.VectorPos3D) {
 
 	for _, ll := range locations {
 		v, islos, _ := pl.PLbetween(vlib.Origin3D, ll)
-
 		dists.AppendAtEnd(vlib.Origin3D.DistanceFrom(ll))
 		pls.AppendAtEnd(-v)
 		los.Append(islos)
 	}
 
 	ds = dataframe.New(series.New(dists, series.Float, "distance"), series.New(pls, series.Float, "PL"), los, series.Floats(locations.X()), series.Floats(locations.Y())).Arrange(dataframe.Sort("distance"))
-
-}
-
-/// FUNCITON HANDLERS
-func plotPL() {
-	p.Add(plotter.NewGrid())
-
-	// var m vlib.MatrixF
-	// m.AppendColumn(ds.Col("distance").Float()).AppendColumn(ds.Col("PL").Float())
-	// plotutil.AddLines(p, m)
-	// p.X.Label.Text = "distance"
-	// p.Y.Label.Text = "Pl (dB)"
-
-	// m.AppendColumn(locations.X()).AppendColumn(locations.Y()).AppendColumn(pls)
-	// pb, _ := plotter.NewBubbles(m, 0, 10)
-	// p.Add(pb)
-	// pb.Color = colorful.LinearRgb(1, 0, 0)
-
-	// histogram
-	var v vlib.VectorF = ds.Col("PL").Float()
-	h, _ := plotter.NewHist(v, 16)
-	// h.Normalize(1)
-	p.Add(h)
-	// p.Y.Max = 1
-	// if recentlyRESIZED {
-	// 	resize()
-	//
-	// }
-	p.Title.Text = fmt.Sprintf("Time %v", time.Now())
-
-	// canvas.Rotate(math.Pi * rand.Float64() / 6)
-
-}
-
-func newFigure(fname string) {
-	// canvas.Scale(3, 4)
-
-	plotutil.AddScatters(p, locations)
-	p.Add(plotter.NewGrid())
-	p.Title.Text = fmt.Sprintf("Time %v", time.Now().Format(time.Stamp))
-
-	p.X.Label.Text = "X"
-	p.Y.Label.Text = "Y"
-	p.Save(500, 500, fname)
 
 }
