@@ -25,8 +25,10 @@ func closing() {
 	fmt.Println("\n========  End RUNTIME =  ", time.Since(start))
 }
 
-var pl CM.RMa
-var pl2 CM.UMa
+var rma CM.RMa
+
+// var pl2 CM.UMa
+
 var ds dataframe.DataFrame
 
 var locations vlib.VectorPos3D
@@ -36,17 +38,20 @@ func main() {
 	defer closing()
 	pf.StartX()
 
+	rma.Set(CM.RMADefault().SetFGHz(1.5))
+	// rma.Init(0.7)
+	rma.SetDMax(21000)
 	fmt.Print("Testing the Channel model\n ")
 
-	pl.Init(30, 1.5, .7)
-	pl.ForceLOS = false
-	pl.SetDMax(15000)
+	// rma.Set(CM.RMADefault())
+	// rma.ForceLOS = false
+	// rma.SetDMax(21000)
 	/// Acutal Data Manipulations
 	// points := deployment.RectangularNPoints(vlib.Origin3D.Cmplx(), 1000, 500, 30, 700)
 	// locations = vlib.FromVectorC(points, 10)
 	// updatePathLoss(pl, locations)
 
-	var N = 10000
+	var N = 21000
 	var dist, vpl vlib.VectorF
 
 	vlos := make([]bool, N)
@@ -55,7 +60,7 @@ func main() {
 	cnt := 0
 	for ii := 10; ii < N; ii += 100 {
 		d := float64(ii)
-		loss, islos, err := pl.PL(d)
+		loss, islos, err := rma.PL(d)
 		_ = err
 		// if err == nil {
 		dist[cnt] = d
@@ -82,16 +87,16 @@ func main() {
 	// ds = ds.Filter(dataframe.F{"PL", series.Neq, 0})
 
 	var m vlib.MatrixF
-	m.AppendColumn(ds.Col("distance").Float()).AppendColumn(ds.Col("PL").Float()).AppendColumn(vpl.Add(-10))
+	m.AppendColumn(ds.Col("distance").Float()).AppendColumn(ds.Col("PL").Float())
 
-	pf.Fig("Kavish Plot")
+	pf.Fig("Rural Macro")
 	pf.Plot(&m)
-	//
-	// pf.SetXlabel("Distance (m)")
-	// pf.SetYlabel(`PL ($dB_m$) `)
+	pf.SetXlabel("Distance (m)")
+	pf.SetYlabel(`PL (dB_m) `)
+	pf.SetXLim(0, 21000)
 	pf.HoldOff()
 	//
-	pf.Plot(&m, 0, 2)
+	// pf.Plot(&m, 0, 2)
 	// pf.ShowX11()
 	// ds.WriteCSV(os.Stdout)
 	pf.Wait()
@@ -105,7 +110,7 @@ func updatePathLoss(pl CM.RMa, locations vlib.VectorPos3D) {
 	los := series.New([]bool{}, series.Bool, "ISLOS")
 
 	for _, ll := range locations {
-		v, islos, _ := pl.PLbetween(vlib.Origin3D, ll)
+		v, islos, _ := rma.PLbetween(vlib.Origin3D, ll)
 		dists.AppendAtEnd(vlib.Origin3D.DistanceFrom(ll))
 		pls.AppendAtEnd(-v)
 		los.Append(islos)

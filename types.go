@@ -15,6 +15,7 @@ import (
 //
 // }
 const C float64 = 3.0e8 // Speed of light
+var DEFAULTERR_PL float64 = 99999
 
 var mlog = math.Log10
 var mpow = math.Pow
@@ -45,9 +46,16 @@ func (f *Frequency) GHz(fghz Frequency) {
 }
 
 type PLModel interface {
+	SetFrequency()
+	IsSupported(fGHz float64) bool
 	PLbetween(node1, node2 vlib.Location3D) (plDb float64, isNLOS bool, err error)
 	IsLOS(dist float64) bool /// Given a distance returns LoS or NLOS statistical (it need not always return same value)
 	PLnlos(dist float64) (plDb float64, e error)
 	PLlos(dist float64) (plDb float64, e error)
 	PL(dist float64) (plDb float64, isNLOS bool, err error)
+}
+
+// EvaluatePL returns the pathloss values for all the distances for the frequency, when fGHz or dist is not Supported, it returns error and corresponding values with DEFAULTERR_PL=99999 (not communicatable channel)
+func EvaluatePL(pm *PLModel, fGHz float64, dists ...float64) {
+
 }
