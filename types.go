@@ -46,7 +46,7 @@ func (f *Frequency) GHz(fghz Frequency) {
 }
 
 type PLModel interface {
-	SetFrequency()
+	Init(fGHz float64)
 	IsSupported(fGHz float64) bool
 	PLbetween(node1, node2 vlib.Location3D) (plDb float64, isNLOS bool, err error)
 	IsLOS(dist float64) bool /// Given a distance returns LoS or NLOS statistical (it need not always return same value)
