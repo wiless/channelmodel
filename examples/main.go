@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gonum/floats"
+	"github.com/gonum/stat"
 	"github.com/kniren/gota/dataframe"
 	"github.com/kniren/gota/series"
+	"github.com/wiless/cellular/deployment"
 	"github.com/wiless/channelmodel"
 	"github.com/wiless/plotutils"
 	"github.com/wiless/vlib"
@@ -95,6 +98,29 @@ func main() {
 	pf.SetYlabel(`PL (dB_m) `)
 	pf.SetXLim(0, 21000)
 	pf.HoldOff()
+	pf.Fig("PDF")
+	span := vlib.NewVectorF(30)
+	floats.Span(span, -220, 0)
+	fmt.Println("SPAN = ", span[20:], span.Len())
+	var hhh vlib.VectorF
+	svpl := vpl.Sorted()
+
+	hhh = stat.Histogram(nil, span, svpl, nil)
+	fmt.Println("HHH = ", hhh[0:10], hhh.Len())
+	//	pf.Hist(vpl)
+	pf.PlotXY(span, hhh)
+	pf.Fig("Hex Layout ")
+	var zz complex128
+	vc := deployment.HexVertices(zz, 300, 30)
+	hexcell := vlib.FromVectorC(vc, 0)
+	time.Sleep(1 * time.Second)
+	pf.PolyGon(hexcell)
+	pf.HoldOn()
+
+	locs := vlib.FromVectorC(deployment.HexRandU(zz, 300, 200, 30), 30)
+	pf.Scatter(locs)
+	// hex returns a hexagon centered at (x,y) with radius r.
+
 	//
 	// pf.Plot(&m, 0, 2)
 	// pf.ShowX11()
