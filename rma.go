@@ -19,7 +19,7 @@ import (
 
 var rmaDMax float64 = 10000.0 /// max distance supported in RMA for LOS
 var rmaH float64 = 5          // Averge building heits in RuralMacro
-var rmaW float64 = 20         // Averge building heits in RuralMacro
+var rmaW float64 = 20         // Averge road width in RuralMacro
 var rmaHBS float64 = 35
 var rmaHUT float64 = 1.5
 var rmaNlosMax float64 = 5000
@@ -31,7 +31,24 @@ type RMa struct {
 	dBP        float64 /// Breaking point distance
 	c1, c2, c3 float64 /// internal constants
 	ForceLOS   bool
+	ForceNLOS  bool
 	isOK       bool
+}
+
+// ForcesLOS for all
+func (r *RMa) ForceAllLOS(f bool) {
+	r.ForceLOS = f
+	if f {
+		r.ForceNLOS = false
+	}
+}
+
+// ForcesLOS for all
+func (r *RMa) ForceAllNLOS(f bool) {
+	r.ForceNLOS = f
+	if f {
+		r.ForceLOS = false
+	}
 }
 
 // Returns a default RMA Model settings
@@ -72,7 +89,7 @@ func (w *RMa) Set(ms *pathloss.ModelSetting) {
 	w.c2 = math.Min(0.044*hh, 14.77)
 	w.c3 = 0.002 * mlog(rmaH)
 	w.ForceLOS = false
-
+	w.ForceNLOS = false
 	w.dBP = 2 * math.Pi * hBS * hUT * fGHz * 1e9 / C
 	w.isOK = true
 }
@@ -106,8 +123,9 @@ func (r RMa) PLbetween(node1, node2 vlib.Location3D) (plDb float64, isNLOS bool,
 	}
 	d3d := node1.DistanceFrom(node2)
 	d2d := node1.Distance2DFrom(node2)
+
 	var LOS bool = r.ForceLOS
-	if !r.ForceLOS {
+	if !r.ForceLOS && !r.ForceNLOS {
 		LOS = r.IsLOS(d2d)
 	}
 	plDb, LOS, err = r.PL(d3d)
@@ -150,7 +168,7 @@ func (r RMa) PL(dist float64) (plDb float64, isNLOS bool, err error) {
 	r.Check()
 
 	var LOS bool = r.ForceLOS
-	if !r.ForceLOS {
+	if !r.ForceLOS && !r.ForceNLOS {
 		LOS = r.IsLOS(dist)
 	}
 
@@ -205,7 +223,7 @@ func (r RMa) los(dist float64) (plDb float64, e error) {
 		return loss, nil
 	} else {
 		// return math.NaN(), fmt.Errorf("Unsupported distance %d for LOS ", dist)
-		return 0, fmt.Errorf("Unsupported distance %.2f for LOS ", dist)
+		return 0, fmt.Errorf("LOS :Unsupported distance %.2f Max:[%f] ", dist, r.CutOffDistance)
 	}
 }
 
