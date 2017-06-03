@@ -59,3 +59,10 @@ type PLModel interface {
 func EvaluatePL(pm *PLModel, fGHz float64, dists ...float64) {
 
 }
+
+// https://wikimedia.org/api/rest_v1/media/math/render/svg/2748541aa04938707a3d25923da2290f4d32ab59
+func FreeSpace(dmtrs float64, fGHz float64) (plDb float64) {
+	// return 20*mlog(dmtrs) + 20*mlog(fGHz*1e9) - 27.55
+		// return 20*mlog(dmtrs) + 20*mlog(fGHz)+20*mlog(1e9)-147.55
+		return 20*mlog(dmtrs) + 20*mlog(fGHz)+32.45
+}
