@@ -30,7 +30,8 @@ const rmaHUT = 1.5
 type RMa struct {
 	*pathloss.ModelSetting
 	dBP        float64 /// Breaking point distance
-	c1, c2, c3 float64 /// internal constants
+	c1, c2, c3 float64 /// internal constants for LOS
+	c4,c5,c6,c7 float64 /// internal constants for NLOS
 	ForceLOS   bool
 	ForceNLOS  bool
 	isOK       bool
@@ -95,10 +96,18 @@ func (w *RMa) Set(ms *pathloss.ModelSetting) {
 	w.c1 = math.Min(0.03*hh, 10)
 	w.c2 = math.Min(0.044*hh, 14.77)
 	w.c3 = 0.002 * mlog(rmaH)
+
 	w.streetW = rmaW
+// nlos constants
+w.c4=161.04-7.1*mlog(w.streetW)+7.5*mlog(rmaH);
+w.c5=-(24.37-3.7* math.Pow(rmaH/hBS,2))*mlog(hBS);
+w.c6=(43.42-3.1*mlog(hBS));
+w.c7=20*mlog(fGHz)-(3.2*(math.Pow(mlog(11.75*hUT),2))-4.97);
+
 	w.ForceLOS = false
 	w.ForceNLOS = false
 	w.dBP = w.BPDistance()
+
 
 	w.isOK = true
 }
@@ -254,9 +263,11 @@ func (r RMa) nlos(dist float64) (plDb float64, e error) {
 
 	if 10 <= d2d && d2d <= r.rmaNlosMax {
 		loss1, err := r.los(d3d)
-		hBS, hUT := r.Value("hBS"), r.Value("hUT")
 
-		loss2 := 161.04 - 7.1*mlog(r.streetW) + 7.5*mlog(rmaH) - (24.37-3.7*math.Pow(rmaH/hBS, 2))*mlog(hBS) + (43.42-3.1*mlog(hBS))*(mlog(d3d)-3) + 20*mlog(freqGHz) - mpow(3.2*(mlog(11.75*hUT)), 2) - 4.97
+		// P3(indx)=C4+C5+C6*(mlog(d3d)-3)+C7;
+		r.c4=161.04-7.1*mlog(r.streetW)+7.5*mlog(rmaH);
+	 loss2 := r.c4 + r.c5 +r.c6*(mlog(d3d)-3) + r.c7
+		// loss2 := 161.04 - 7.1*mlog(r.streetW) + 7.5*mlog(rmaH) - (24.37-3.7*math.Pow(rmaH/hBS, 2))*mlog(hBS) + (43.42-3.1*mlog(hBS))*(mlog(d3d)-3) + 20*mlog(freqGHz) - mpow(3.2*(mlog(11.75*hUT)), 2) - 4.97
 		// if r.Extended {
 		// 	log.Printf("Reduced PLDB %v | %v to %v ", loss1, loss2, loss2+12)
 		// 	loss2 -= 12.0 // Reduced NLOS
