@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/gonum/floats"
-	"github.com/gonum/stat"
 	"github.com/kniren/gota/dataframe"
 	"github.com/kniren/gota/series"
 	"github.com/wiless/cellular/deployment"
@@ -102,13 +101,15 @@ func main() {
 	span := vlib.NewVectorF(30)
 	floats.Span(span, -220, 0)
 	fmt.Println("SPAN = ", span[20:], span.Len())
-	var hhh vlib.VectorF
-	svpl := vpl.Sorted()
+	// var hhh vlib.VectorF
+	// svpl := vpl.Sorted()
 
-	hhh = stat.Histogram(nil, span, svpl, nil)
-	fmt.Println("HHH = ", hhh[0:10], hhh.Len())
-	//	pf.Hist(vpl)
-	pf.PlotXY(span, hhh)
+	// hhh = stat.Histogram(nil, span, svpl, nil)
+	// fmt.Println("HHH = ", hhh[0:10], hhh.Len())
+	// //	pf.Hist(vpl)
+	// log.Print(hhh)
+
+	// pf.PlotXY(span, hhh)
 	pf.Fig("Hex Layout ")
 	var zz complex128
 	vc := deployment.HexVertices(zz, 300, 30)
@@ -123,7 +124,7 @@ func main() {
 
 	//
 	// pf.Plot(&m, 0, 2)
-	// pf.ShowX11()
+	pf.ShowX11()
 	// ds.WriteCSV(os.Stdout)
 	pf.Wait()
 }
