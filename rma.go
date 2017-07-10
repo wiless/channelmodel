@@ -91,6 +91,8 @@ func (w *RMa) Set(ms *pathloss.ModelSetting) {
 		log.Print("Could not find paramters hBS / hUT in the setting, Setting to Default 35.0m & 1.5m")
 		hBS = rmaHBS
 		hUT = rmaHUT
+	}else {
+		log.Print("Good found values !! ")
 	}
 	hh := math.Pow(rmaH, 1.72)
 	w.c1 = math.Min(0.03*hh, 10)
@@ -255,7 +257,7 @@ func (r RMa) PL(dist float64) (plDb float64, isNLOS bool, err error) {
 // non-exported functions internal / private routines
 func (r RMa) nlos(dist float64) (plDb float64, e error) {
 	freqGHz := r.FGHz()
- log.Print("NLOS Freq is ",freqGHz)
+ // log.Print("NLOS Freq is ",freqGHz)
 	var d3d, d2d float64 = dist, dist
 	if d2d < 10 {
 		return FreeSpace(d2d,freqGHz), nil
@@ -268,10 +270,7 @@ func (r RMa) nlos(dist float64) (plDb float64, e error) {
 		r.c4=161.04-7.1*mlog(r.streetW)+7.5*mlog(rmaH);
 	 loss2 := r.c4 + r.c5 +r.c6*(mlog(d3d)-3) + r.c7
 		// loss2 := 161.04 - 7.1*mlog(r.streetW) + 7.5*mlog(rmaH) - (24.37-3.7*math.Pow(rmaH/hBS, 2))*mlog(hBS) + (43.42-3.1*mlog(hBS))*(mlog(d3d)-3) + 20*mlog(freqGHz) - mpow(3.2*(mlog(11.75*hUT)), 2) - 4.97
-		// if r.Extended {
-		// 	log.Printf("Reduced PLDB %v | %v to %v ", loss1, loss2, loss2+12)
-		// 	loss2 -= 12.0 // Reduced NLOS
-		// }
+
 		if err!=nil {
 			log.Println("NLOS ERR ",loss1,err)
 		}
@@ -279,23 +278,8 @@ func (r RMa) nlos(dist float64) (plDb float64, e error) {
 		nlosdB := max(loss1, loss2)
 
 
-		if d2d<r.dBP {
-			fmt.Printf("\n WITHIN BP NLOS (%v | BP=%v): LOS P1 %v   NLOS= %v : PICKED LOSS2 = ??  %v ",d2d,r.dBP,loss1,loss2,loss2>loss1)
-		}else{
-			fmt.Printf("\n BEYOND BP NLOS (%v |BP =%v): LOS P2 %v   NLOS=%v : PICKED LOSS2 = ?? %v",d2d,r.dBP,loss1,loss2,loss2>loss1)
-		}
-		// if r.Extended {
-			// log.Printf("Reduced PLDB %v | %v to %v ", loss1, loss2, loss2-r.A,r.B)
-			// nlosdB -= 12.0
-			// if d2d>r.dBP {
-			nlosdB = max(loss1, loss2-r.A)-r.B
 if r.Extended{
-// log.Println("I am extended")
-		if d2d<=r.dBP {
-			nlosdB = max(loss1, loss2)
-		}else{
-			nlosdB = max(loss1, loss2)-r.B
-		}
+			nlosdB = max(loss1, loss2-r.A)
 }
 
 		//  }
@@ -315,7 +299,7 @@ func (r *RMa) p1(d3d, freqGHz float64) (plDb float64, valid bool) {
 
 func (r RMa) los(dist float64) (plDb float64, e error) {
 	freqGHz := r.FGHz()
-	log.Print("LOS Freq is ",freqGHz)
+
 	var d3d, d2d float64 = dist, dist
   e=nil
 	if d2d < 10 {
