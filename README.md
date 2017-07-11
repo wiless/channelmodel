@@ -7,12 +7,12 @@ This channelmodel (CM) library implements different IMT2020 channel models from 
 
 
 # Sample Usage
-```
-import "github.com/wiless/channelmodel"
+```go
+  import "github.com/wiless/channelmodel"
 
 
-	var rma CM.RMa
-	plmodel:=CM.RMADefault()
+  var rma CM.RMa
+  plmodel:=CM.RMADefault()
   plmodel.SetFGz(0.7);
   rma.Set(plmodel)
   
