@@ -47,14 +47,14 @@ func (i *UMa) IsValid(fcGHz float64, dist_m float64, los bool) (bool, error) {
 	}
 
 	if los {
-		// 1 m d3D  100 m
-		if !(dist_m >= 1 && dist_m <= 150) {
-			return false, fmt.Errorf("UMa : LOS dist  %f outside  range 1 < d3D < 150m ", dist_m)
+		// 10m <= d3D  <=5000 m
+		if !(dist_m >= 10 && dist_m <= 5000) {
+			return false, fmt.Errorf("UMa : LOS dist  %f outside  range 10 < d2D < 5000m ", dist_m)
 		}
 	} else {
 		// NLOS
-		if !(dist_m >= 1 && dist_m <= 150) { /// UPDATE TO 150 from 86 as WP5D#28
-			return false, fmt.Errorf("UMa : LOS dist %f outside  range 1 < d3D < 86m ", dist_m)
+		if !(dist_m >= 10 && dist_m <= 5000) {
+			return false, fmt.Errorf("UMa : LOS dist %f outside  range 1 < d3D < 5000m ", dist_m)
 		}
 	}
 

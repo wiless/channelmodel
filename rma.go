@@ -17,13 +17,11 @@ import (
 //
 // }
 
-const rmaDMax = 10000.0 /// max distance supported in RMA for LOS
-const rmaH float64 = 5  // Averge building heits in RuralMacro
+const rmaDMax = 21000.0 /// max distance supported in RMA for LOS
+const rmaH float64 = 5  // Averge building heights in RuralMacro
 const rmaW float64 = 20 // Averge road width in RuralMacro
 const rmaHBS float64 = 35
 const rmaHUT = 1.5
-
-// var rmaNlosMax float64 = 5000
 
 //wraps the interface for supporting deployment link
 
@@ -39,6 +37,13 @@ type RMa struct {
 	rmaNlosMax     float64
 	streetW        float64
 	nlossOffset    float64 // Offset for LMLC
+}
+
+// LoadIMT2020 loads the default parameters as approved in M.2412 (IMT2020 Evaluation Methodology)
+func (r *RMa) LoadIMT2020(fGHz float64) {
+	// r.Set(RMADefault())
+	r.Set(RMADefault().SetFGHz(fGHz))
+	r.ShadowLoss = true
 }
 
 // ForcesLOS for all
@@ -61,7 +66,7 @@ func (r *RMa) ForceAllNLOS(f bool) {
 func RMADefault() *pathloss.ModelSetting {
 	ms := pathloss.NewModelSetting()
 	ms.SetFGHz(.7)
-	ms.CutOffDistance = 21000 /// updated with recent ITU doc
+	ms.CutOffDistance = 21000 /// updated with recent ITU doc M.2412
 	ms.Name = "RMa"
 	ms.AddParam("HBS", rmaHBS).AddParam("HUT", rmaHUT)
 	return ms
@@ -77,7 +82,7 @@ func (w *RMa) Set(ms *pathloss.ModelSetting) {
 	if ms.CutOffDistance == 0 {
 		ms.CutOffDistance = rmaDMax
 	}
-	w.rmaNlosMax = 5000
+	w.rmaNlosMax = 21000
 
 	// copy(w.ModelSetting, *ms)
 	w.ModelSetting = ms
@@ -110,25 +115,13 @@ func (w *RMa) Set(ms *pathloss.ModelSetting) {
 	w.ForceNLOS = false
 	w.dBP = w.BPDistance()
 
-	w.nlossOffset = 12.0 // 12dB offset if its LMLC
-
+	w.nlossOffset = 12.0 // 12dB offset if its LMLC M.2412 Condition
 	w.isOK = true
 }
 
 //DMax returns the maximum supported distance
 func (r RMa) DMax() float64 {
 	return r.CutOffDistance
-}
-
-func (r *RMa) SetExtended(isext bool) {
-	r.Extended = isext
-	if isext {
-		r.SetDMax(21000)     // based on update for LMLC
-		r.SetNLosDMax(21000) // based on update for LMLC
-	} else {
-		r.SetDMax(10000)     // based on update for LMLC
-		r.SetNLosDMax(10000) // based on update for LMLC
-	}
 }
 
 func (r *RMa) SetStreetW(ww float64) {
@@ -173,21 +166,18 @@ func (r RMa) IsSupported(fghz float64) bool {
 	return false
 }
 
-func (r RMa) PLbetween(node1, node2 vlib.Location3D) (plDb float64, isNLOS bool, err error) {
+func (r RMa) PLbetween(node1, node2 vlib.Location3D) (plDb float64, isLOS bool, err error) {
+
 	if !r.isOK {
 		log.Panicln("RMA: Model not Initialized ...")
 	}
 	d3d := node1.DistanceFrom(node2)
-	d2d := node1.Distance2DFrom(node2)
+	// d2d := node1.Distance2DFrom(node2)
 
-	var LOS bool = r.ForceLOS
-	if !r.ForceLOS && !r.ForceNLOS {
-		LOS = r.IsLOS(d2d)
-	}
-	plDb, LOS, err = r.PL(d3d)
-	if LOS && err != nil {
-		log.Printf("PL  ISLOS=%v , ERROR=%v , %v to %v  ", LOS, err, node1, node2)
-	}
+	plDb, LOS, err := r.PL(d3d)
+	// if LOS && err != nil {
+	// 	log.Printf("PL  ISLOS=%v , ERROR=%v , %v to %v  ", LOS, err, node1, node2)
+	// }
 	return plDb, LOS, err
 }
 
@@ -195,18 +185,17 @@ func (r RMa) IsLOS(d2d float64) bool {
 	if !r.isOK {
 		log.Panicln("RMA: Model not Initialized ...")
 	}
+	if d2d > r.rmaNlosMax {
+		// Model does not support NLOS > rmaNlosMax (=21000)
+		return true
+	}
 
 	if d2d <= 10 {
 		return true
 	} else {
 
-		// Model does not suppor NLOS > rmaNlosMax (=5000)
-		if d2d > r.rmaNlosMax {
-			return true
-		}
-
 		P_LOS := mexp(-(d2d - 10) / 1000)
-		if rand.Float64() < P_LOS {
+		if rand.Float64() <= P_LOS {
 			return true
 		} else {
 			return false
@@ -229,11 +218,18 @@ func (r RMa) PLosPDF(d2d float64) float64 {
 		return P_LOS
 	}
 }
+
 func (r RMa) PLnlos(dist float64) (plDb float64, e error) {
 	r.Check()
 
 	pldb, err := r.nlos(dist)
+	if r.ShadowLoss && err == nil {
+		// Add NLOS Shadow Loss
+		// See TABLE A1-5
+		sigmaSFdB := 8.0
+		pldb += RandLogNorm(0, sigmaSFdB)
 
+	}
 	return pldb, err
 
 }
@@ -243,29 +239,113 @@ func (r RMa) PLlos(dist float64) (plDb float64, e error) {
 
 	pldb, err := r.los(dist)
 
+	if r.ShadowLoss && dist >= 10 && err == nil {
+		var sigmaSFdB float64
+		if dist < r.dBP {
+			sigmaSFdB = 4.0
+		} else {
+			sigmaSFdB = 6.0
+		}
+		pldb += RandLogNorm(0, sigmaSFdB)
+	}
 	return pldb, err
 
 }
 
-func (r RMa) PL(dist float64) (plDb float64, isNLOS bool, err error) {
+func (r RMa) PLbetweenIndoor(node1, node2 vlib.Location3D, dIn float64) (plDb float64, isLOS bool, err error) {
+	if !r.isOK {
+		log.Panicln("RMA: Model not Initialized ...")
+	}
+	d3d := node1.DistanceFrom(node2)
+	d2d := node1.Distance2DFrom(node2)
+
+	var LOS bool = r.ForceLOS
+
+	if !r.ForceLOS && !r.ForceNLOS {
+		LOS = r.IsLOS(d2d)
+	}
+
+	plDb, LOS, err = r.PLIndoor(d3d, dIn)
+	// if LOS && err != nil {
+	// 	log.Printf("PL  ISLOS=%v , ERROR=%v , %v to %v  ", LOS, err, node1, node2)
+	// }
+	return plDb, LOS, err
+}
+func (r RMa) PLIndoor(distTotal float64, dIn float64) (plDb float64, isNLOS bool, err error) {
+	r.Check()
+
+	var LOS bool = r.ForceLOS
+	var dOut = distTotal - dIn
+	if !r.ForceLOS && !r.ForceNLOS {
+		if distTotal < r.rmaNlosMax {
+			if dIn == 0 {
+				// Outdoor UE
+				LOS = r.IsLOS(distTotal)
+			} else {
+				LOS = r.IsLOS(dOut)
+			}
+		}
+	}
+
+	if !LOS {
+		pldb, err := r.nlos(dOut)
+		if r.ShadowLoss && err == nil {
+			// Add NLOS Shadow Loss
+			// See TABLE A1-5
+			sigmaSFdB := 8.0
+			pldb += RandLogNorm(0, sigmaSFdB)
+
+		}
+		return pldb, LOS, err
+
+	} else {
+		pldb, err := r.los(dOut)
+		if r.ShadowLoss && dOut >= 10 && err == nil {
+			var sigmaSFdB float64
+			if dOut < r.dBP {
+				sigmaSFdB = 4.0
+			} else {
+				sigmaSFdB = 6.0
+			}
+			pldb += RandLogNorm(0, sigmaSFdB)
+		}
+		return pldb, LOS, err
+	}
+}
+
+func (r RMa) PL(dist float64) (plDb float64, isLOS bool, err error) {
 	r.Check()
 
 	var LOS bool = r.ForceLOS
 	if !r.ForceLOS && !r.ForceNLOS {
-		if dist < r.rmaNlosMax {
-			LOS = r.IsLOS(dist)
-		}
+		// if dist < r.rmaNlosMax {
+		LOS = r.IsLOS(dist)
+		// }
 
 	}
 
 	if !LOS {
 		pldb, err := r.nlos(dist)
+		if r.ShadowLoss && err == nil {
+			// Add NLOS Shadow Loss
+			// See TABLE A1-5
+			sigmaSFdB := 8.0
+			pldb += RandLogNorm(0, sigmaSFdB)
 
+		}
 		return pldb, LOS, err
 
 	} else {
 		pldb, err := r.los(dist)
-
+		if r.ShadowLoss && dist >= 10 && err == nil {
+			var sigmaSFdB float64
+			if dist < r.dBP {
+				sigmaSFdB = 4.0
+			} else {
+				sigmaSFdB = 6.0
+			}
+			pldb += RandLogNorm(0, sigmaSFdB)
+		}
 		return pldb, LOS, err
 	}
 }
@@ -298,11 +378,9 @@ func (r RMa) nlos(dist float64) (plDb float64, e error) {
 			nlosdB = max(loss1, loss2-r.nlossOffset)
 		}
 
-		//  }
-		// }
 		return nlosdB, nil
 	} else {
-		return 99999, fmt.Errorf("NLOS : Distance %f not supported in this model ", dist)
+		return 99999, fmt.Errorf("NLOS:Unsupported d=%.2f>%f", dist, r.CutOffDistance)
 	}
 }
 
@@ -340,7 +418,7 @@ func (r RMa) los(dist float64) (plDb float64, e error) {
 		return loss, nil
 	} else {
 		// return math.NaN(), fmt.Errorf("Unsupported distance %d for LOS ", dist)
-		return 0, fmt.Errorf("LOS :Unsupported distance %.2f Max:[%f] ", dist, r.CutOffDistance)
+		return 99999, fmt.Errorf("LOS:Unsupported d=%.2f>%f", dist, r.CutOffDistance)
 	}
 }
 
@@ -378,4 +456,26 @@ func (r RMa) FnP2(d, fGHz float64) (pdDb float64, valid bool) {
 
 	return p2, valid
 
+}
+
+// O2IBuildingLossDb returns the Outdoor to Indoor Penetration Loss in dB
+// Ref M.2412 Section 3.2, Table A1.7
+// O2I=PLtw +PLin +N(0,σP2) , PLtw is the building penetration loss through the external wall,
+// PLin is the inside loss dependent on the depth into the building, and
+// σP is the standard deviation for the penetration loss.
+// Only the Low-Loss model applicable
+func (r RMa) O2ILossDb(fGHz float64, d2Din float64) float64 {
+	if d2Din == 0 {
+		return 0
+	}
+	// Material Loss + Building Loss
+	Ptw := 10.0 // for 3GPP low-loss model equation to be used..
+	PLin := 0.5 * d2Din
+	//sigmaP := 0
+
+	if fGHz > 6 {
+		log.Printf("RMA:O2I Not supported for f(%v)>6GHz", fGHz)
+		return 99999
+	}
+	return Ptw + PLin //+ rand.NormFloat64()
 }
