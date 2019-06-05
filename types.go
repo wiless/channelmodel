@@ -18,6 +18,19 @@ import (
 const C float64 = 3.0e8 // Speed of light
 var DEFAULTERR_PL float64 = 99999
 
+type TestEnv int
+
+const (
+	RMA TestEnv = iota
+	UMA
+	UMi
+	Inh
+)
+
+func (te TestEnv) String() string {
+	return [...]string{"RMa", "UMa", "UMi", "InH"}[te]
+}
+
 var msqrt = math.Sqrt
 var mlog = math.Log10
 var mpow = math.Pow
