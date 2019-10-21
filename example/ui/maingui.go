@@ -8,18 +8,20 @@ import (
 
 	"github.com/BurntSushi/xgbutil"
 	"github.com/BurntSushi/xgbutil/xevent"
-	"github.com/gonum/plot"
-	"github.com/gonum/plot/plotter"
-	"github.com/gonum/plot/plotutil"
-	"github.com/gonum/plot/vg"
-	"github.com/gonum/plot/vg/draw"
-	"github.com/gonum/plot/vg/vgimg"
-	"github.com/kniren/gota/dataframe"
-	"github.com/kniren/gota/series"
+	"github.com/go-gota/gota/dataframe"
+	"github.com/go-gota/gota/series"
+	// "github.com/kniren/gota/dataframe"
+	// "github.com/kniren/gota/series"
 	"github.com/wiless/cellular/deployment"
 	"github.com/wiless/channelmodel"
 	"github.com/wiless/vlib"
 	"github.com/wiless/x11ui"
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/plotutil"
+	"gonum.org/v1/plot/vg"
+	"gonum.org/v1/plot/vg/draw"
+	"gonum.org/v1/plot/vg/vgimg"
 )
 
 var start time.Time
@@ -44,6 +46,7 @@ var plotwin *x11ui.Window
 
 var pl CM.RMa
 var ds dataframe.DataFrame
+
 var recentlyRESIZED bool
 
 var resize = func() {
@@ -93,8 +96,8 @@ func main() {
 	app.RegisterKey("r", resize)
 
 	fmt.Print("Testing the Channel model")
-
-	pl.Init(30, 1.5, .7)
+	pl.Init(5)
+	// pl.Init(30, 1.5, .7)
 	pl.ForceLOS = false
 
 	/// Acutal Data Manipulations
