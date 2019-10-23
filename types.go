@@ -70,9 +70,10 @@ type PLModel interface {
 	PLlos(dist float64) (plDb float64, e error)
 	PL(dist float64) (plDb float64, isNLOS bool, err error)
 	O2ILossDb(fGHz float64, d2Din float64) (o2ilossdB float64)
-	O2ICarLossDb() float64 // returns the Loss between O2I inside a Car
-	Env() string           // Return the name of the environment e.g RMa, UMa, InH , allows custom implementations
-	ShadowLoss() bool      // Returns if shadowloss need to be added
+	O2ICarLossDb() float64    // returns the Loss between O2I inside a Car
+	Env() string              // Return the name of the environment e.g RMa, UMa, InH , allows custom implementations
+	EnableShadowLoss(sh bool) // Sets the Shadow Fading to TRUE or FALSE
+	IsShadowLoss() bool       // Returns the Shadow Fading TRUE or FALSE
 }
 
 // EvaluatePL returns the pathloss values for all the distances for the frequency, when fGHz or dist is not Supported, it returns error and corresponding values with DEFAULTERR_PL=99999 (not communicatable channel)
